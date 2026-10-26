@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline Transfer</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; background-color: #f0f2f5; }
+        .card { background: white; padding: 20px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        
+        /* Chat Box Styles */
+        #chat-box { height: 300px; overflow-y: auto; background: #e9ecef; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .msg { margin-bottom: 10px; padding: 10px; border-radius: 8px; max-width: 80%; clear: both; word-wrap: break-word;}
+        .msg.pc { background: #007bff; color: white; float: right; }
+        .msg.mobile { background: #28a745; color: white; float: left; }
+        .msg.system { background: #6c757d; color: white; text-align: center; float: none; margin: 0 auto; display: table; font-size: 0.85em; }
+        
+        /* Inputs */
+        .input-group { display: flex; gap: 10px; }
+        input[type="text"] { flex-grow: 1; padding: 12px; border: 1px solid #ccc; border-radius: 5px; }
+        button { padding: 12px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .file-btn { background: #17a2b8; width: 100%; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h2 style="text-align: center; color: #333;">Live Transfer</h2>
+
+    <div class="card">
+        <!-- The live chat window -->
+        <div id="chat-box"></div>
+
+        <!-- The text input area -->
+        <div class="input-group">
+            <input type="text" id="msg-input" placeholder="Type a message or paste a link..." required>
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h4 style="margin-top: 0;">Send Document / Photo</h4>
+        <input type="file" id="file-input" required>
+        <button class="file-btn" onclick="sendFile()">Upload File</button>
+    </div>
+
+    <script>
+        // Check for new messages every 1 second
+        setInterval(fetchMessages, 1000);
+        let messageCount = 0;
+
+        function fetchMessages() {
+            fetch('/get_messages')
+                .then(response => response.json())
+                .then(data => {
+                    // Only update if there are new messages
+                    if (data.length > messageCount) {
+                        const chatBox = document.getElementById('chat-box');
+                        chatBox.innerHTML = '';
+                        
+                        data.forEach(msg => {
+                            const div = document.createElement('div');
+                            // Apply CSS class based on who sent it
+                            div.className = 'msg ' + msg.sender.toLowerCase();
+                            div.innerText = msg.sender + ': ' + msg.text;
+                            chatBox.appendChild(div);
+                        });
+                        
+                        // Scroll to the bottom
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                        messageCount = data.length;
+                    }
+                });
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('msg-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            fetch('/send_message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text })
+            }).then(() => {
+                input.value = ''; // Clear input
+                fetchMessages();  // Instantly update screen
+            });
+        }
+
+        function sendFile() {
+            const fileInput = document.getElementById('file-input');
+            if (fileInput.files.length === 0) {
+                alert("Please select a file first.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            fetch('/upload_file', {
+                method: 'POST',
+                body: formData
+            }).then(() => {
+                fileInput.value = ''; // Clear file input
+                fetchMessages();      // Update screen with system notification
+            });
+        }
+
+        // Allow pressing "Enter" to send text
+        document.getElementById("msg-input").addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
